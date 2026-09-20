@@ -49,7 +49,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--output-model-name", default=None, help="아티팩트/저장소 이름. 미지정 시 <Base>-Q4_K_M-GGUF")
     p.add_argument("--upload", action="store_true", help="HF Hub 업로드 실행")
     p.add_argument("--hf-token", default=None, help="HF API 토큰 (미지정 시 HF_TOKEN 환경변수)")
-    p.add_argument("--hf-user", default=None, help="HF 사용자/조직명 (--upload 시 필요, 미지정 시 whoami 조회)")
+    p.add_argument("--hf-user", default=None, help="HF 사용자/조직명 (--upload 시 필수, --hf-user 또는 HF_USER로 명시)")
     p.add_argument("--show-inference-instruction", action="store_true", help="추론/서빙 예시 출력")
     # --- 기법 특화 옵션 (모두 기본값으로 동작) ---
     p.add_argument("--quant-type", default="Q4_K_M",
@@ -288,11 +288,9 @@ def upload_to_hub(args: argparse.Namespace, output_dir: Path, model_name: str) -
     api = HfApi(token=token)
     user = args.hf_user or os.environ.get("HF_USER")
     if not user:
-        try:
-            user = api.whoami()["name"]
-        except Exception as e:
-            print(f"[gguf][ERROR] --hf-user 생략 + whoami 실패: {e}", file=sys.stderr)
-            sys.exit(1)
+        print("[gguf][ERROR] 업로드 계정 미지정. --hf-user 또는 HF_USER 환경변수로 명시하세요.",
+              file=sys.stderr)
+        sys.exit(1)
     repo_id = model_name if "/" in model_name else f"{user}/{model_name}"
     try:
         api.create_repo(repo_id, exist_ok=True, private=False)
@@ -328,8 +326,9 @@ def print_inference_instructions(args: argparse.Namespace, output_dir: Path, mod
 
 def main() -> None:
     args = parse_args()
-    if args.upload and not (args.hf_user or args.hf_token or os.environ.get("HF_TOKEN")):
-        print("[gguf] 경고: --upload 시 --hf-user/토큰이 필요합니다. whoami 조회를 시도합니다.")
+    if args.upload and not (args.hf_user or os.environ.get("HF_USER")
+                           or args.hf_token or os.environ.get("HF_TOKEN")):
+        print("[gguf] 경고: --upload 시 --hf-user/HF_USER와 --hf-token/HF_TOKEN 명시가 필요합니다.")
     out_dir = run_quantization(args)
     model_name = args.output_model_name or default_output_name(args.hf_model, args.quant_type)
     repo_id = upload_to_hub(args, out_dir, model_name)

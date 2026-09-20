@@ -8,23 +8,25 @@
 ```
 family/<family>/technique/<technique>/tool/<tool>/
 ├── src/<impl>.py           # PEP 723 인라인 의존성 (`uv run src/...` 즉시 실행, venv 불필요)
-├── run.sh                  # (일부) wrapper 템플릿
+├── quantize.sh             # (일부) 양자화 wrapper 템플릿
+├── upload.sh               # (일부) 업로드 템플릿
 ├── README.md               # 기법 문서
 ├── .python-version         # 필요 시 technique 단위 override (기본은 루트 3.12)
 └── <input-model-slug>__to__<output-model-slug>/
-    ├── run.sh              # 핀된 실행본 (slug 반영 옵션, 호출 위치 무관)
+    ├── quantize.sh         # 양자화만 수행 (--upload 전달 시 에러, 호출 위치 무관)
+    ├── upload.sh           # output/ 업로드 전용 (HF_USER/HF_TOKEN 명시 필수)
     └── output/             # 산출물 (gitignore, Hub 업로드용)
 ```
 
 실행 예 (어느 디렉토리에서든 동일 결과, INFRA 기본값 dgx-spark-1x):
 
 ```bash
-./family/weight-only/technique/gptq/tool/python/allenai-llama-3.1-tulu-3-8b__to__Llama-3.1-Tulu-3-8B-GPTQ-Int4-128g/run.sh
-INFRA=runpod-h100-1x ./family/container/technique/gguf/tool/python/allenai-llama-3.1-tulu-3-8b__to__Llama-3.1-Tulu-3-8B-Q4_K_M-GGUF/run.sh
-EXTRA_ARGS="--upload --hf-user myorg" ./family/weight-only/technique/awq/tool/autoawq/.../run.sh
+./family/weight-only/technique/gptq/tool/python/allenai-llama-3.1-tulu-3-8b__to__Llama-3.1-Tulu-3-8B-GPTQ-Int4-128g/quantize.sh
+INFRA=runpod-h100-1x ./family/container/technique/gguf/tool/python/allenai-llama-3.1-tulu-3-8b__to__Llama-3.1-Tulu-3-8B-Q4_K_M-GGUF/quantize.sh
+HF_USER=<user> HF_TOKEN=<token> ./family/weight-only/technique/awq/tool/autoawq/.../upload.sh
 ```
 
-Python 버전은 루트 `.python-version`(3.12)이 기본이며, `run.sh`가 technique
+Python 버전은 루트 `.python-version`(3.12)이 기본이며, `quantize.sh`가 technique
 디렉터리로 `cd`한 뒤 `uv run`하므로 technique 아래 `.python-version`이
 자동 override된다. 상세는 `infra/README.md` 참조.
 
@@ -44,12 +46,13 @@ family에 1회만 배치하고, 모드별 실행은 `<input>__to__<output>` 디�
 - `<output-model-slug>`: `--output-model-name` 그대로 (예: `Llama-3.1-Tulu-3-8B-GPTQ-Int4-128g`)
 - 같은 입력 모델의 다중 설정(Q4_K_M vs Q8_0 등)은 output slug로 구분되므로 충돌 없음
 
-## 업로드 관행
+## 양자화·업로드 분리 (명시 필수, 기본값 없음)
 
-- `run.sh` 기본 실행은 로컬 전용 (`--upload` OFF).
-- 로컬 동작 확인 후 `./run.sh --upload` → `HF_USER`(기본 `tayaee`, env로 override) 계정으로 업로드.
-  토큰은 `HF_TOKEN` 환경변수, 게이트 모델(Codestral 등)은 승인된 토큰 필요.
-- 모든 `src/*.py`는 `--hf-user` > `HF_USER` env > `whoami()` 순으로 계정을 결정한다.
+- `./quantize.sh`: 양자화만 수행. `--upload` 전달 시 에러 종료.
+- `HF_USER=<user> HF_TOKEN=<token> ./upload.sh`: `output/` 업로드 전용.
+  계정·토큰 중 하나라도 없거나 `output/`이 비어 있으면 에러 종료한다.
+- 모든 `src/*.py`는 `--hf-user` > `HF_USER` env 순으로 계정을 결정하고,
+  둘 다 없으면 에러 종료한다 (`whoami()` 조회 없음).
 
 ## 코딩 모델 실습 세트 (dgx-spark-1x, 128GB 통합메모리)
 

@@ -155,11 +155,9 @@ def upload_to_hub(args: argparse.Namespace, output_dir: Path, model_name: str) -
     api = HfApi(token=token)
     user = args.hf_user or os.environ.get("HF_USER")
     if not user:
-        try:
-            user = api.whoami()["name"]
-        except Exception as e:
-            print(f"[aqlm][ERROR] whoami 실패: {e}", file=sys.stderr)
-            sys.exit(1)
+        print("[aqlm][ERROR] 업로드 계정 미지정. --hf-user 또는 HF_USER 환경변수로 명시하세요.",
+              file=sys.stderr)
+        sys.exit(1)
     repo_id = model_name if "/" in model_name else f"{user}/{model_name}"
     try:
         api.create_repo(repo_id, exist_ok=True, private=False)
