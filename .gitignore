@@ -1,0 +1,16 @@
+# 양자화 산출물 (GB 단위 가중치 — Hub에 업로드하고 git 추적 제외)
+**/runs/**/output/
+*.gguf
+*.safetensors
+*.bin
+*.pt
+*.onnx
+
+# 실행 로그·캐시
+*.log
+__pycache__/
+.uv-cache/
+.env
+
+# 외부 저장소 체크아웃 (공식 구현 오케스트레이션용)
+third_party/
